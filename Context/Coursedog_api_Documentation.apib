@@ -1,0 +1,1483 @@
+FORMAT: 1A
+HOST: http://.../api/v1/em/
+
+# Coursedog Events API
+> ⚠️ **Major Update:** We're in the process of moving API documentation from Apiary to a new platform to bring you a more modern, interactive and user-friendly API experience. 
+> We'll email when the new site is ready.
+
+- The following document outlines the Coursedog RESTful API for Events. 
+- Custom fields in the API will appear only once a value is populated. If the field has no initial value, the custom field will not appear in the API. 
+- Custom Question ID updates are not supported via API. To maintain data integrity and avoid the risk of surfacing outdated or unintended values, updating custom questionIds via the API is not recommended.
+- If you have any questions, please submit a support ticket. 
+
+## Allowed HTTPs Requests
+
+- PUT     : Update resource
+- POST    : Create resource
+- GET     : Get a resource or list of resources
+- DELETE  : To delete resource
+
+## Endpoints
+
+- https://app.coursedog.com/api/v1/     : Production Environment
+- https://staging.coursedog.com/api/v1/     : Staging Environment
+
+## Authentication
+
+Coursedog APIs use the OAuth 2.0 protocol for authentication and authorization. Coursedog supports common OAuth 2.0 scenarios such as those for web server, and client-side applications. All protected endpoints must be accessed by requests that contain an OAuth 2.0 access tokens using the Bearer authentication scheme.
+
+Bearer authentication (also called token authentication) is an HTTP authentication scheme that involves security tokens called bearer tokens. The name “Bearer authentication” can be understood as “give access to the bearer of this token.” The bearer token is a cryptic string. The client must send this token in the `Authorization` header when making requests to protected resources:
+`Authorization: Bearer <token>`
+
+### Authentication Steps
+
+- Obtain an access token from the Coursedog Authorization Server. Before your application can access private data using a Coursedog API, it must obtain an access token that grants access to that API. A single access token can grant varying degrees of access to multiple APIs. 
+
+    - To get the token, make a request to the following public endpoint  - POST (<<endpoint>>/sessions). The body should be a JSON object containing your client email and password. Here is an example: 
+
+        - { “email”: “john@example.com”, “password”: "123"}
+        
+    - If the email and password are correct, and you are allowed to receive an access token, the token will come in the response of the request. 
+
+- Send the access token to the API. After an application obtains an access token, it sends the token to a Coursedog API in an HTTP authorization header, using the bearer authentication scheme. It is possible to send tokens as URI query-string parameters, but we don't recommend it, because URI parameters can end up in log files that are not completely secure. Also, it is good REST practice to avoid creating unnecessary URI parameter names.
+
+- Refresh the Access token if necessary. The default lifetime of a token is 24 hours. 
+
+### Role-Based Access Control (RBAC) Enforcement
+
+- Coursedog's API follows Role-Based Access Control (RBAC) for managing access to endpoints. Different roles have associated permissions that define which roles are allowed to perform certain actions, ensuring security and proper access control.
+
+- If you are encountering an error like 403 forbidden, please check with your system administrator or the person managing the API access at your Institution to ensure that your user account is assigned the appropriate role and permissions.
+
+## Description Of Usual Server Responses:
+
+- 200 `OK` - the request was successful (some API calls may return 201 instead).
+
+- 201 `Created` - the request was successful and a resource was created.
+
+- 204 `No Content` - the request was successful but there is no representation to return (i.e. the response is empty).
+
+- 400 `Bad Request` - the request could not be understood or was missing required parameters.
+
+- 401 `Unauthorized` - authentication failed or user doesn't have permissions for requested operation.
+
+- 403 `Forbidden` - access denied.
+
+- 404 `Not Found` - resource was not found.
+
+- 405 `Method Not Allowed` - requested method is not supported for resource.
+
+---
+
+# Group Events
+
+Represents event information.
+
+---
+
+**Event Attributes:**
+- id `(String)` : Event's unique ID, **Required**
+- version `(Number)` : Event's version number
+- lastEditedAt `(Integer)` : Last time this event was edited, as a unix timestamp
+- lastEditedBy `(String)` : Last person to edit this event
+- createdAt `(Integer)` : Time this event was created, as a unix timestamp
+- createdBy `(String)` : Person that created this event
+- institutionId `(String)` : This is used when institutions have a seperate unique identifier for each
+
+- name `(String)` : Event's name, **Required**
+- type `(String)` : Type of the event. Different event types have different event forms, and the calendar can show different event types in different colors, **Required**
+- description `(String)` : Event's description, This description will show up in the public events page, **Required**
+- organization `(String)` :  ID of organization who is hosting the event, **Required**, ***Oranization Reference***
+- authorId `(String)` : ID of the user who created the event, ***User Reference***
+- authorType `(String)` : The type of event author
+- owners `(Array<String>)` : ID of all users set as owners of this event, ***User Reference***
+- contacts `(Array<Contact Object>)` : List of event's contacts
+- cost `(String | Float)` : Event's cost
+- discount `(Float)` : Event's cost discount
+- administrativeFeePercentage `(Integer)` : Event's cost administrative fee percentage, out of 100
+- administrativeFeeValue `(Float)` : Event's cost administrative fee value
+- contractId `(String)` : Event's associated contract
+- imageURL `(String)` : URL of the image that will be shown alongside the event content in the public event page
+- attachments `(Array<Attachment Object>)` : List of URL links for any additional file attachments, **Required**
+- notes `(String)` : Event notes. This field will not be shown on the public event page. It is for internal use only
+
+- expectedHeadCount `(Number)` : Predicted Head Count of the event
+- registeredHeadCount `(Number)` : Number of registered event attendees
+- actualHeadCount `(Number)` : Number of event attendees
+
+- status `(String)` : Status of the event. Default is ‘Confirmed’. New events that have not been approved have status = “Pending”
+- featured `(Boolean)` : Flag indicating a featured event. Featured events get shown on home page of Public Event Site
+- private `(Boolean)` : Flag indicating a private event. Private events will not show up in public event site, but will show up in Event Dashboard. However, all event details will be redacted for all users except the event author
+- hidden `(Boolean)` : Flag indicating a hidden event. Hidden events will not show up in public event site. Additionally, the event will not show up in the event dashboard for any user except the author of the event
+
+- sectionInfo `(Array<Section Info Object>)` : List of event's related sections
+
+- meetings `(Array<Meeting Object>)` : List of event's meetings
+
+- customFields (Object) : This event's custom field values
+
+The following are GET-only APIs; no PUT, POST, or DELETE will be supported.
+
+- eventPriceOverride `(Float)`:  (Invoiced Event Price) The edited total event price displayed on an Event invoice
+
+- stripeInvoiceLink `(String)`: If the Stripe integration toggle is ON for an event, the invoice link generated in Stripe for an Event
+
+- description `(String)` :  (Payment Instructions) Notes on payment that can be added to the invoice
+
+- roomTotal `(Float)`: Total price charged for a Room within one Event
+
+- invoicedRoomTotal `(Float)` :  (Invoiced Room Price) The edited total Room price displayed on an Event invoice
+
+- resource `(Array<Required Resource Object>)` :  List of Event's resources
+
+- resourceTotal `(Float)`: Total price charged for an individual Resource within one Event
+
+- invoicedResourceTotal `(Float)` :  The edited total Resource price displayed on an Event invoice
+
+**Attachment Object:**
+- url `(String)` : Attachment's URL, **Required**
+- name `(String)` : Attachment's name, **Required**
+
+**Meeting Attributes:**
+- id `(String)` : Meeting's unique ID, **Required**
+- eventId `(String)` : Meeting's event's unique ID, ***Event Reference***
+
+- roomId `(String)` : Meeting's room's ID, **Required**, ***Room Reference***
+- layout `(String)` : Meeting's layout
+- resources `(Array<Required Resource Object>)` : List of meeting's resources, **Required**
+
+- startDate `(String)` : Meeting's start date in 'YYYY-MM-DD' format, **Required**
+- endDate `(String)` : Meeting's end date in 'YYYY-MM-DD' format, **Required**
+- startTime `(Number)` : Meeting's start time, **Required**
+- endTime `(Number)` : Meeting's end time, **Required**
+- allDay `(Boolean)` : Whether object is all day 
+- patternId `(String)` : Meeting's repeat pattern id
+- pattern `(Pattern Object)` : Meeting's repeat pattern
+- patternChild `(Boolean)` : Whether this meeting is a pattern child
+- patternParent `(Boolean)` : Whether this meeting is a pattern parent
+
+- status `(String)` : Meeting's status
+- featured `(Boolean)` : Flag indicating a featured event. Featured events get shown on home page of Public Event Site
+- private `(Boolean)` : Flag indicating a private event. Private events will not show up in public event site, but will show up in Event Dashboard. However, all event details will be redacted for all users except the event author
+- hidden `(Boolean)` : Flag indicating a hidden event. Hidden events will not show up in public event site. Additionally, the event will not show up in the event dashboard for any user except the author of the event
+
+- parentMeeting `(String)` : Meeting's info about parent meetings
+- moveWithParent `(Boolean)` : Whether meeting should move with parent
+- isSetup `(Boolean)` : Whether meeting is for setup 
+- isTeardown `(Boolean)` : Whether meeting is for teardown 
+
+- sectionInfo `(Array<Section Info Object>)` : List of meeting's related sections
+
+**Required Resource Object:**
+- id `(String)` : Resource's ID, **Required**, ***Resource Reference***
+- quanitity `(Number)` : Needed quantity of referenced resource, **Required**
+
+**Pattern Object:**
+- unit `(String)` : Pattern's unit of stepping, **Required**
+- step `(Number)` : Pattern's number of steps, **Required**
+- days `(Array<Number>)` : Pattern's days, **Required**
+- dateLimit `(String)` : Pattern's last date
+- numberLimit `(Number)` : Pattern's last step number
+- label `(String)` : A label for this pattern
+
+**Section Info Object:**
+- year `(String)` : Section's year, **Required**
+- semester `(String)` : Section's semester, **Required**
+- sectionId `(String)` : Section's ID, **Required**, ***Section Reference***
+- courseId `(String)` : Section's course's ID, **Required**, ***Course Reference***
+
+## Events [/{schoolId}/events]
+
+### Get All Events [GET /{schoolId}/events]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned all events
+
+    + Body
+    
+            {
+                "<eventId>": {
+                    "id": "<eventId>",
+                    "name": "Event Name",
+                    "description": "Event Description",
+                    "type": "Meeting",
+                    "organization": "<organizationId>",
+                    "contacts": [
+                        {
+                            "name": "Guy, Some",
+                            "email": "someguy@example.edu",
+                            "phone": "",
+                            "notify": false,
+                            "role": "Requestor"
+                        }
+                    ],
+                    "attachments": [],
+                    "hidden": false,
+                    "private": false,
+                    "featured": false,
+                    "meetings": []
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put Multiple Events [PUT /{schoolId}/events]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "<eventId>": {
+                    "id": "<eventId>",
+                    "name": "Event Name",
+                    "description": "Event Description",
+                    "type": "Meeting",
+                    "organization": "<organizationId>",
+                    "contacts": [
+                        {
+                            "name": "Guy, Some",
+                            "email": "someguy@example.edu",
+                            "phone": "",
+                            "notify": false,
+                            "role": "Requestor"
+                        }
+                    ],
+                    "attachments": [],
+                    "hidden": false,
+                    "private": false,
+                    "featured": false,
+                    "meetings": []
+                }
+            }
+
++ Response 200 (application/json)
+
+    Successfully put a group of events
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Get A Specific Event [GET /{schoolId}/events/{eventId}]
+    
++ Parameters
+
+    + schoolId (required) - school id
+    + eventId (required) - event id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned an event
+
+    + Body
+    
+            {
+                "id": "<eventId>",
+                "name": "Event Name",
+                "description": "Event Description",
+                "type": "Meeting",
+                "organization": "<organizationId>",
+                "contacts": [
+                    {
+                        "name": "Guy, Some",
+                        "email": "someguy@example.edu",
+                        "phone": "",
+                        "notify": false,
+                        "role": "Requestor"
+                    }
+                ],
+                "attachments": [],
+                "hidden": false,
+                "private": false,
+                "featured": false,
+                "meetings": []
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Get A Specific Event's Version History [GET /{schoolId}/events/vh/{eventId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + eventId (required) - event id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned an event's version history
+
+    + Body
+    
+            {
+
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put An Event [PUT /{schoolId}/events/{eventId}]
+   
++ Parameters
+
+    + schoolId (required) - school id
+    + eventId (required) - event id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "id": "<eventId>",
+                "name": "Event Name",
+                "description": "Event Description",
+                "type": "Meeting",
+                "organization": "<organizationId>",
+                "contacts": [
+                    {
+                        "name": "Guy, Some",
+                        "email": "someguy@example.edu",
+                        "phone": "",
+                        "notify": false,
+                        "role": "Requestor"
+                    }
+                ],
+                "attachments": [],
+                "hidden": false,
+                "private": false,
+                "featured": false,
+                "meetings": []
+            }
+
++ Response 200 (application/json)
+
+    Successfully put an event
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Post An Event [POST /{schoolId}/events?doPutMeetings=true]
+    
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "name": "Event Name",
+                "description": "Event Description",
+                "type": "Meeting",
+                "organization": "<organizationId>",
+                "contacts": [
+                    {
+                        "name": "Guy, Some",
+                        "email": "someguy@example.edu",
+                        "phone": "",
+                        "notify": false,
+                        "role": "Requestor"
+                    }
+                ],
+                "attachments": [],
+                "hidden": false,
+                "private": false,
+                "featured": false,
+                "meetings": [
+                    {
+                    "resources": [],
+                    "startDate": "2023-11-17",
+                    "endDate": "2023-11-17",
+                    "startTime": "0800",
+                    "endTime": "0900",
+                    "roomId": "1A-101C"
+                    }
+                ]
+            }
+
++ Response 200 (application/json)
+
+    Successfully posted an event
+
+    + Body
+    
+            eventId
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Delete An Event [DELETE /{schoolId}/events/{eventId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + eventId (required) - event id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
+    + Body
+
++ Response 200 (application/json)
+
+    Successfully deleted an event
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Search For Events [GET /{schoolId}/events/search/{searchQuery}]
+    
++ Parameters
+
+    + schoolId (required) - school id
+    + searchQuery (required) - Query to search for events. Performs fuzzy text matching against the `name` and `type` attributes.
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned all events matching search query
+
+    + Body
+    
+            {
+                "<eventId>": {
+                    "id": "<eventId>",
+                    "name": "Event Name",
+                    "description": "Event Description",
+                    "type": "Meeting",
+                    "organization": "<organizationId>",
+                    "contacts": [
+                        {
+                            "name": "Guy, Some",
+                            "email": "someguy@example.edu",
+                            "phone": "",
+                            "notify": false,
+                            "role": "Requestor"
+                        }
+                    ],
+                    "attachments": [],
+                    "hidden": false,
+                    "private": false,
+                    "featured": false,
+                    "meetings": []
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+# Group Resources
+
+Represents resource information.
+
+---
+
+**Resource Attributes:**
+- id `(String)` : Resource's unique ID, **Required**
+- name `(String)` : Resource's name, **Required**
+- type `(String)` : Resource's type, **Required**
+- description `(String)` : Resource's description, **Required**
+- quantity `(Number)` : Resource's total available quantity, **Required**
+- category `(String)` : Resource's category, **Required**, ***Resource Category Reference***
+- groups `(Array<String>)` : Resource's groups, **Required**, ***Resource Group References***
+- allowedRooms `(Array<String>)` : Resource's possible rooms, ***Room References***
+- requireConfirmation `(Boolean)` : Whether resource requires confirmation
+- imageURLs `(Array<String>)` : Resource's image URLs
+- notes `(String)` : Resource's notes
+- setupServices `(Service Object)` : Resource's setup services
+- teardownServices `(Service Object)` : Resource's teardown services
+
+- items `(Array<Item Object>)` : List of resource's items
+
+- workflowStep `(Workflow Step Object)` : Resource's workflow step
+        
+**Service Attributes:**
+- name `(String)` : Service's name
+- required `(Boolean)` : Whether service is required
+- requireResource `(Boolean)` : Whether resource is required
+- nonExclusive `(Boolean)` : Whether service is not exclusive
+- defaultDuration `(Number)` : Service's default duration
+
+**Item Object:**
+- id `(String)` : Item's ID
+- required `(Boolean)` : Whether item is required
+- locked `(Boolean)` : Whether item is locked
+
+**Workflow Step Attributes:**
+- id `(String)` : Workflow step's unique ID
+- name `(String)` : Workflow step's name
+- required `(Boolean)` : Whether workflow step is required
+- participants `(Array<Participant Object>)` : List of workflow step's participants
+- percentRequired `(Number)` : Workflow step's percent required
+- ifReject `(String)` : What to do if workflow step is rejected
+- ifDeadline `(String)` : What to do if workflow step is at its deadline
+- hasDeadline `(Boolean)` : Whether workflow step has deadline
+- deadline `(String)` : Workflow step's deadline
+- nextStep `(String)` : Workflow step's next step, ***Worflow step reference***
+- isRoot `(Boolean)` : Whether workflow step is the root step
+
+**Participant Object:**
+- userId `(String)` : Participant's ID, ***User Reference***
+- canVote `(Boolean)` : Whether participant can vote
+- canComment `(Boolean)` : Whether participant can comment
+- canEdit `(Boolean)` : Whether participant can edit
+- canEditWorkflow `(Boolean)` : Whether participant can edit workflow
+- canForceApprove `(Boolean)` : Whether participant can force approve
+
+## Resources [/{schoolId}/resources]
+
+### Get All Resources [GET /{schoolId}/resources]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned all resources
+
+    + Body
+    
+            {
+                "<resourceId>": {
+                    "id": "<resourceId>",
+                    "name": "Resource Name",
+                    "type": "Equipment",
+                    "description": "Resource Description",
+                    "quantity": 2,
+                    "category": "Audio/Visual",
+                    "groups": [],
+                    "setupServices": {
+                        "defaultDuration": 20,
+                        "id": "<serviceId>"
+                    },
+                    "teardownServices": {
+                        "defaultDuration": 10,
+                        "id": "<serviceId>"
+                    },
+                    "workflowStep": {
+                        "id": "<workflowStepId>",
+                        "name": "Step Name",
+                        "participants": [
+                            {
+                                "userId": "user@example.edu",
+                                "canVote": true,
+                                "canComment": true,
+                                "canEdit": false,
+                                "canEditWorkflow": false,
+                                "canForceApprove": false
+                            }
+                        ]
+                    }
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put Multiple Resources [PUT /{schoolId}/resources]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "<resourceId>": {
+                    "id": "<resourceId>",
+                    "name": "Resource Name",
+                    "type": "Equipment",
+                    "description": "Resource Description",
+                    "quantity": 2,
+                    "category": "Audio/Visual",
+                    "groups": [],
+                    "setupServices": {
+                        "defaultDuration": 20,
+                        "id": "<serviceId>"
+                    },
+                    "teardownServices": {
+                        "defaultDuration": 10,
+                        "id": "<serviceId>"
+                    },
+                    "workflowStep": {
+                        "id": "<workflowStepId>",
+                        "name": "Step Name",
+                        "participants": [
+                            {
+                                "userId": "user@example.edu",
+                                "canVote": true,
+                                "canComment": true,
+                                "canEdit": false,
+                                "canEditWorkflow": false,
+                                "canForceApprove": false
+                            }
+                        ]
+                    }
+                }
+            }
+
++ Response 200 (application/json)
+
+    Successfully put a group of resources
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Get A Specific Resource [GET /{schoolId}/resources/{resourceId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + resourceId (required) - resource id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned a resource
+
+    + Body
+    
+            {
+                "id": "<resourceId>",
+                "name": "Resource Name",
+                "type": "Equipment",
+                "description": "Resource Description",
+                "quantity": 2,
+                "category": "Audio/Visual",
+                "groups": [],
+                "setupServices": {
+                    "defaultDuration": 20,
+                    "id": "<serviceId>"
+                },
+                "teardownServices": {
+                    "defaultDuration": 10,
+                    "id": "<serviceId>"
+                },
+                "workflowStep": {
+                    "id": "<workflowStepId>",
+                    "name": "Step Name",
+                    "participants": [
+                        {
+                            "userId": "user@example.edu",
+                            "canVote": true,
+                            "canComment": true,
+                            "canEdit": false,
+                            "canEditWorkflow": false,
+                            "canForceApprove": false
+                        }
+                    ]
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put A Resource [PUT /{schoolId}/resources/{resourceId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + resourceId (required) - resource id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "id": "<resourceId>",
+                "name": "Resource Name",
+                "type": "Equipment",
+                "description": "Resource Description",
+                "quantity": 2,
+                "category": "Audio/Visual",
+                "groups": [],
+                "setupServices": {
+                    "defaultDuration": 20,
+                    "id": "<serviceId>"
+                },
+                "teardownServices": {
+                    "defaultDuration": 10,
+                    "id": "<serviceId>"
+                },
+                "workflowStep": {
+                    "id": "<workflowStepId>",
+                    "name": "Step Name",
+                    "participants": [
+                        {
+                            "userId": "user@example.edu",
+                            "canVote": true,
+                            "canComment": true,
+                            "canEdit": false,
+                            "canEditWorkflow": false,
+                            "canForceApprove": false
+                        }
+                    ]
+                }
+            }
+
++ Response 200 (application/json)
+
+    Successfully put a resource
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Post A Resource [POST /{schoolId}/resources/{resourceId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + resourceId (required) - resource id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "id": "<resourceId>",
+                "name": "Resource Name",
+                "type": "Equipment",
+                "description": "Resource Description",
+                "quantity": 2,
+                "category": "Audio/Visual",
+                "groups": [],
+                "setupServices": {
+                    "defaultDuration": 20,
+                    "id": "<serviceId>"
+                },
+                "teardownServices": {
+                    "defaultDuration": 10,
+                    "id": "<serviceId>"
+                },
+                "workflowStep": {
+                    "id": "<workflowStepId>",
+                    "name": "Step Name",
+                    "participants": [
+                        {
+                            "userId": "user@example.edu",
+                            "canVote": true,
+                            "canComment": true,
+                            "canEdit": false,
+                            "canEditWorkflow": false,
+                            "canForceApprove": false
+                        }
+                    ]
+                }
+            }
+
++ Response 200 (application/json)
+
+    Successfully posted a resource
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Delete A Resource [DELETE /{schoolId}/resources/{resourceId}]
+    
++ Parameters
+
+    + schoolId (required) - school id
+    + resourceId (required) - resource id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
+    + Body
+
++ Response 200 (application/json)
+
+    Successfully deleted a resource
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Search For Resources [GET /{schoolId}/resources/search/{searchQuery}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + searchQuery (required) - query to search for resources
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned all resources matching search query
+
+    + Body
+    
+            {
+                "<resourceId>": {
+                    "id": "<resourceId>",
+                    "name": "Resource Name",
+                    "type": "Equipment",
+                    "description": "Resource Description",
+                    "quantity": 2,
+                    "category": "Audio/Visual",
+                    "groups": [],
+                    "setupServices": {
+                        "defaultDuration": 20,
+                        "id": "<serviceId>"
+                    },
+                    "teardownServices": {
+                        "defaultDuration": 10,
+                        "id": "<serviceId>"
+                    },
+                    "workflowStep": {
+                        "id": "<workflowStepId>",
+                        "name": "Step Name",
+                        "participants": [
+                            {
+                                "userId": "user@example.edu",
+                                "canVote": true,
+                                "canComment": true,
+                                "canEdit": false,
+                                "canEditWorkflow": false,
+                                "canForceApprove": false
+                            }
+                        ]
+                    }
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+# Group Organizations
+
+Represents organization information.
+
+---
+
+**Organization Attributes:**
+- id `(String)` : Organization's unique ID, **Required**
+- name `(String)` : Organization's name, **Required**
+- type `(String)` : Organization's type
+- contacts `(Array<Contact Object>)` : List of object's contacts
+
+## Organizations [/{schoolId}/organizations]
+
+### Get All Organizations [GET /{schoolId}/organizations]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned all organizations
+
+    + Body
+    
+            {
+                "<organizationId>": {
+                    "id": "<organizationId>",
+                    "name": "Org Name",
+                    "type": "",
+                    "contacts": []
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put Multiple Organizations [PUT /{schoolId}/organizations]
+
++ Parameters
+
+    + schoolId (required) - school id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "<organizationId>": {
+                    "id": "<organizationId>",
+                    "name": "Org Name",
+                    "type": "",
+                    "contacts": []
+                }
+            }
+
++ Response 200 (application/json)
+
+    Successfully put a group of organizations
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Get A Specific Organization [GET /{schoolId}/organizations/{organizationId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + organizationId (required) - organization id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned an organization
+
+    + Body
+    
+            {
+                "id": "<organizationId>",
+                "name": "Org Name",
+                "type": "",
+                "contacts": []
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Put An Organization [PUT /{schoolId}/organizations/{organizationId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + organizationId (required) - organization id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "id": "<organizationId>",
+                "name": "Org Name",
+                "type": "",
+                "contacts": []
+            }
+
++ Response 200 (application/json)
+
+    Successfully put an organiztion
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Post An Organization [POST /{schoolId}/organizations/{organizationId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + organizationId (required) - organization id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+            
+    + Body 
+    
+            {
+                "id": "<organizationId>",
+                "name": "Org Name",
+                "type": "",
+                "contacts": []
+            }
+
++ Response 200 (application/json)
+
+    Successfully post an organiztion
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+### Delete An Organization [DELETE /{schoolId}/organizations/{organizationId}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + organizationId (required) - organization id
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
+    + Body
+
++ Response 200 (application/json)
+
+    Successfully deleted an organzation
+
+    + Body
+
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+# Group Meetings Calendar
+
+Represents meetings calendar information.
+
+---
+
+**Meetings Calendar Attributes:**
+- events: `(Array<Calendar Event Object>)` : List of event information, **Required**
+
+**Calendar Event Attributes:**
+- id `(String)` : Event's unique ID, **Required**
+- start `(String)` : Event's start date, **Required**
+- end `(String)` : Event's end date, **Required**
+- allDay `(Boolean)` : Whether event is all day 
+- title `(String)` : Event's title, **Required**
+- data `(Data Object)` : Event's further information
+
+**Data Object:**
+- eventId `(String)` : Event's unique ID, **Required**, ***Event Reference***
+- organization `(String)` : Event's organization's ID, **Required**, ***Organization Reference***
+- name `(String)` : Event's name, **Required**
+- eventType `(String)` : Event's type, **Required**
+
+## Meetings Calendars [/{schoolId}/meetingsCalendar]
+
+### Get Meetings Calendar [GET /{schoolId}/meetingsCalendar/{calendarType}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + calendarType (required) - type of calendar to return
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned meetings calendar
+
+    + Body
+    
+            {
+                "events": [
+                    {
+                      "id": "<id>",
+                      "start": "2019-09-03",
+                      "end": "2019-09-03",
+                      "allDay": true,
+                      "title": "Event Title",
+                      "data": {
+                        "eventId": "<eventId>",
+                        "name": "Event Name",
+                        "organization": "<organizationId>",
+                        "eventType": "Community"
+                      }
+                    }
+                ]
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+## Meetings [/{schoolId}/meetings]
+
+### Get Meetings [GET /{schoolId}/meetings{?startDate,endDate}]
+
++ Parameters
+
+    + schoolId (required) - school id
+    + startDate (optional) - match meetings starting on or after this date, in ISO 8601 format, such as 2023-09-01
+    + endDate (optional) - match meetings starting before or on this date, in ISO 8601 format, such as 2023-09-30
+
++ Request (application/json)
+
+    + Headers
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    Successfully returned meetings matching date range
+
+    + Body
+    
+            {
+                "<id>": {
+                    "endDate": "2023-09-14",
+                    "endTime": 900,
+                    "eventId": "<eventId>",
+                    "featured": null,
+                    "hidden": null,
+                    "id": "<id>",
+                    "private": null,
+                    "public": null,
+                    "resources": [],
+                    "startDate": "2023-09-14",
+                    "startTime": 800,
+                    "status": "Confirmed",
+                    "eventData": {
+                        "attachments": [],
+                        "contacts": [],
+                        "description": "Event Description",
+                        "id": "<eventId>",
+                        "name": "Event Name",
+                        "organization": "<organizationId>",
+                        "status": "Confirmed",
+                        "type": "Event Type",
+                        "version": 2
+                    }
+                }
+            }
+            
++ Response 400 (application/json)
+
+    Bad Request
+
+    + Body
+
++ Response 403 (application/json)
+
+    Forbidden
+
+    + Body
+
+# Group Commonly Reused Objects
+
+Other common object definitions.
+
+---
+
+## Contact Attributes
+- id `(String)` : Contact's ID, ***User Reference***
+- type `(String)` : Contact's type
+- name `(String)` : Contact's name
+- email `(String)` : Contact's email
+- phone `(String)` : Contact's phone number
+- role `(String)` : Contact's role
+- notify `(Boolean)` : Whether to notify contact
+
+---
+
+
+
+
+
+
+    
+    
+    
+    

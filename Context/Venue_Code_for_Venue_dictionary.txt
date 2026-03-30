@@ -1,0 +1,15 @@
+Edge_cases_Venue_Code = {
+    # UCC
+    "# TechFlex venues use "TechFlex:"
+    "UCC Tech Flex Space A (Back)": "TechFlex",
+    "UCC Tech Flex Space B (Middle)": "TechFlex",
+    "UCC Tech Flex Space C (Front)": "TechFlex",
+    "UCC 106 (The Gallery)": "Gallery",
+    "UCC Pi Kitchen": "UCC PI Kitchen",
+    # Babbio
+    "Babbio 100 (Atrium)": "Atrium",
+    # Howe
+    "Howe 404 (Skyline 1)": "Skyline",
+    "Howe 406 (Skyline 2)": "Skyline 2",
+    "Howe 409 (Bissinger)": "Bissinger",
+}
