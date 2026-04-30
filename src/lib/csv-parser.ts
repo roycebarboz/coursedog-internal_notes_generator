@@ -2,10 +2,11 @@ import type { CsvEventRow, EventGroup, ParsedDateTime } from "./types";
 import { extractBuilding } from "./venue-codes";
 
 /** CSV column headers as they appear in the Coursedog export. */
-const COL = {
+export const COL = {
   NAME: "Event Name",
   DATE_TIME: "Date & Time",
   LOCATION: "Location",
+  MEETING_TYPE: "Meeting Type",
   NOTES: "Internal Events Notes  (General Event)",
   EVENT_ID: "Event ID",
   FACILITIES: "Facilities Request ? (General Event)",
@@ -20,11 +21,17 @@ export function parseCsvRows(rawRows: Record<string, string>[]): CsvEventRow[] {
       eventName: (row[COL.NAME] || "").trim(),
       dateTime: (row[COL.DATE_TIME] || "").trim(),
       location: (row[COL.LOCATION] || "").trim(),
+      meetingType: (row[COL.MEETING_TYPE] || "").trim(),
       internalNotes: (row[COL.NOTES] || "").trim(),
       eventId: (row[COL.EVENT_ID] || "").trim(),
       facilitiesRequest: (row[COL.FACILITIES] || "").trim(),
     }))
-    .filter((row) => row.eventName && row.eventId);
+    .filter(
+      (row) =>
+        row.eventName &&
+        row.eventId &&
+        row.meetingType.toLowerCase() === "main meeting"
+    );
 }
 
 /**

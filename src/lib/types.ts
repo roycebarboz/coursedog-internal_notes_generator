@@ -3,6 +3,7 @@ export interface CsvEventRow {
   eventName: string;
   dateTime: string; // e.g. "Mar 19, 2026 7:30 AM - 6:00 PM"
   location: string; // e.g. "UCC 106 (The Gallery)"
+  meetingType: string; // e.g. "Main Meeting"
   internalNotes: string;
   eventId: string;
   facilitiesRequest: string; // "Yes" | "No" | "-"
@@ -60,6 +61,22 @@ export interface EventGroup {
   setupInstructions: string; // furniture details from manager
 }
 
+// ── Venue timeline entry built from Coursedog meetings API ──
+export interface VenueTimelineEntry {
+  start: number; // minutes from midnight
+  end: number; // minutes from midnight
+  name: string; // event name
+  eventId: string;
+  isSetup: boolean;
+  isTeardown: boolean;
+}
+
+/**
+ * Nested map: roomId (= location name) → dateKey (YYYY-MM-DD) → sorted timeline entries.
+ * Built from the Coursedog meetings API response.
+ */
+export type VenueTimelines = Map<string, Map<string, VenueTimelineEntry[]>>;
+
 // ── Generated note ready for review ──
 export interface GeneratedNote {
   eventGroup: EventGroup;
@@ -67,8 +84,9 @@ export interface GeneratedNote {
   reservationNumber: string;
   venueLabel: string;
   setupTimeLine: string; // e.g. "Please set up on Wednesday, March 18, at 3 PM"
-  setupInstructions: string; // furniture details
+  setupInstructions: string; // furniture details (from {braces} in internal notes)
   breakdownTimeLine: string; // e.g. "Please break down Saturday, March 21, in the AM"
+  additionalNotes: string; // non-braced portion of internal notes, shown after breakdown
   fullNote: string; // the complete formatted note
   warnings: string[]; // e.g. "Less than 60 min for setup — notify manager"
 }

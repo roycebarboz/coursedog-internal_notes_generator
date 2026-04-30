@@ -1,4 +1,4 @@
-import type { CsvEventRow, EventGroup, GeneratedNote, ParsedDateTime } from "./types";
+import type { CsvEventRow, EventGroup, GeneratedNote, ParsedDateTime, VenueTimelineEntry, VenueTimelines } from "./types";
 import type { CoursedogEvent } from "./types";
 import { CUSTOM_FIELDS } from "./coursedog";
 import {
@@ -10,7 +10,6 @@ import {
   parseDateTime,
   toDateKey,
   toMMDD,
-  getVenueTimeline,
 } from "./csv-parser";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -65,6 +64,62 @@ function formatDateReadable(date: Date): string {
   return `${DAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
 }
 
+// ── Venue Timeline from API ──
+
+/**
+ * Build a VenueTimelines lookup from raw Coursedog meetings API response.
+ * The API returns an object keyed by meeting ID.
+ */
+export function buildVenueTimelines(
+  rawMeetings: Record<string, Record<string, unknown>>
+): VenueTimelines {
+  const map: VenueTimelines = new Map();
+
+  for (const m of Object.values(rawMeetings)) {
+    const roomId = m.roomId as string | undefined;
+    const startDate = m.startDate as string | undefined;
+    if (!roomId || !startDate) continue;
+
+    const startTime = m.startTime as number;
+    const endTime = m.endTime as number;
+
+    const entry: VenueTimelineEntry = {
+      start: Math.floor(startTime / 100) * 60 + (startTime % 100),
+      end: Math.floor(endTime / 100) * 60 + (endTime % 100),
+      name: (m.eventData as { name?: string })?.name ?? "",
+      eventId: (m.eventId as string) ?? "",
+      isSetup: (m.isSetup as boolean) ?? false,
+      isTeardown: (m.isTeardown as boolean) ?? false,
+    };
+
+    if (!map.has(roomId)) map.set(roomId, new Map());
+    const roomMap = map.get(roomId)!;
+    if (!roomMap.has(startDate)) roomMap.set(startDate, []);
+    roomMap.get(startDate)!.push(entry);
+  }
+
+  // Sort each date's entries by start time
+  for (const roomMap of map.values()) {
+    for (const entries of roomMap.values()) {
+      entries.sort((a, b) => a.start - b.start);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Look up all events at a venue on a specific date from the pre-built API timeline.
+ * Drop-in replacement for the old CSV-based getVenueTimeline.
+ */
+function getVenueTimeline(
+  venueTimelines: VenueTimelines,
+  venue: string,
+  dateKey: string
+): VenueTimelineEntry[] {
+  return venueTimelines.get(venue)?.get(dateKey) ?? [];
+}
+
 /** Returns true if any of the event's locations is an outdoor space (patio, lawn, etc.). */
 function isOutdoorVenue(locations: string[]): boolean {
   const outdoorKeywords = /patio|lawn|outdoor|outside|terrace|courtyard|field|plaza|garden|roof|deck/i;
@@ -90,6 +145,33 @@ function isMinimalOutdoorSetup(rows: CsvEventRow[]): boolean {
   return tableCount <= 1 && chairCount <= 2;
 }
 
+/**
+ * Parse internal notes into setup instructions (content inside {braces})
+ * and additional notes (everything outside braces).
+ *
+ * If no braces are present, the entire string is treated as setup instructions
+ * (preserving existing behavior).
+ */
+function parseInternalNotes(raw: string): {
+  setupInstructions: string;
+  additionalNotes: string;
+} {
+  if (!raw) return { setupInstructions: "", additionalNotes: "" };
+
+  const braceMatch = raw.match(/\{([\s\S]*?)\}/);
+  if (!braceMatch) {
+    // No braces — entire string is setup instructions (legacy behavior)
+    return { setupInstructions: raw.trim(), additionalNotes: "" };
+  }
+
+  const setupInstructions = braceMatch[1].trim();
+  const additionalNotes = raw
+    .replace(braceMatch[0], "")
+    .trim();
+
+  return { setupInstructions, additionalNotes };
+}
+
 // ── Setup Time Calculation ──
 
 /**
@@ -104,7 +186,7 @@ function isMinimalOutdoorSetup(rows: CsvEventRow[]): boolean {
  */
 function calculateSetupTime(
   eventGroup: EventGroup,
-  allRows: CsvEventRow[]
+  venueTimelines: VenueTimelines
 ): { setupDate: Date; setupTime: string; warnings: string[] } {
   const warnings: string[] = [];
 
@@ -136,7 +218,7 @@ function calculateSetupTime(
   if (eventStartMin >= timeToMinutes(17, 0)) {
     let venueIsFree = true;
     for (const loc of eventGroup.locations) {
-      const timeline = getVenueTimeline(allRows, loc, dateKey);
+      const timeline = getVenueTimeline(venueTimelines, loc, dateKey);
       const otherEvents = timeline.filter(
         (e) => normalizeEventName(e.name) !== eventGroup.normalizedName
       );
@@ -180,7 +262,7 @@ function calculateSetupTime(
       const prevDayKey = toDateKey(prevDay);
       let venueFreeAfter4PM = true;
       for (const loc of eventGroup.locations) {
-        const prevTimeline = getVenueTimeline(allRows, loc, prevDayKey);
+        const prevTimeline = getVenueTimeline(venueTimelines, loc, prevDayKey);
         if (prevTimeline.some((e) => e.end > timeToMinutes(16, 0))) {
           venueFreeAfter4PM = false;
           break;
@@ -206,7 +288,7 @@ function calculateSetupTime(
   let sharp = false;
   if (!priorDay) {
     for (const loc of eventGroup.locations) {
-      const timeline = getVenueTimeline(allRows, loc, dateKey);
+      const timeline = getVenueTimeline(venueTimelines, loc, dateKey);
       const otherEvents = timeline.filter(
         (e) => normalizeEventName(e.name) !== eventGroup.normalizedName
       );
@@ -268,7 +350,7 @@ function calculateSetupTime(
  */
 function calculateBreakdownTime(
   eventGroup: EventGroup,
-  allRows: CsvEventRow[]
+  venueTimelines: VenueTimelines
 ): string {
   // Find the latest end time across main event rows
   const mainRows = eventGroup.rows.filter(
@@ -290,20 +372,22 @@ function calculateBreakdownTime(
 
   // Edge case (a): Check if there's a subsequent event with setup in the same venue
   for (const loc of eventGroup.locations) {
-    const timeline = getVenueTimeline(allRows, loc, dateKey);
+    const timeline = getVenueTimeline(venueTimelines, loc, dateKey);
+    // Get later non-setup/non-teardown events (main meetings only)
     const laterEvents = timeline.filter(
       (e) =>
         e.start >= eventEndMin &&
+        !e.isSetup &&
+        !e.isTeardown &&
         normalizeEventName(e.name) !== eventGroup.normalizedName
     );
 
-    // Check if any later event has a setup meeting
+    // Check if any later event has a setup meeting in this venue
     for (const later of laterEvents) {
-      const hasSetup = allRows.some(
-        (r) =>
-          r.location === loc &&
-          r.eventName.match(/^Setup\s*:/i) &&
-          normalizeEventName(r.eventName) === normalizeEventName(later.name)
+      const hasSetup = timeline.some(
+        (e) =>
+          e.isSetup &&
+          e.eventId === later.eventId
       );
       if (hasSetup) {
         return "Please break down in the PM";
@@ -321,7 +405,7 @@ function calculateBreakdownTime(
       const tomorrow = getNextDay(eventDate);
       if (isWeekend(tomorrow)) {
         const tomorrowKey = toDateKey(tomorrow);
-        const tomorrowTimeline = getVenueTimeline(allRows, loc, tomorrowKey);
+        const tomorrowTimeline = getVenueTimeline(venueTimelines, loc, tomorrowKey);
         if (tomorrowTimeline.length > 0) {
           hasWeekendFollowup = true;
           break;
@@ -329,7 +413,7 @@ function calculateBreakdownTime(
       }
 
       // Also check remaining events today after ours
-      const todayTimeline = getVenueTimeline(allRows, loc, dateKey);
+      const todayTimeline = getVenueTimeline(venueTimelines, loc, dateKey);
       const laterToday = todayTimeline.filter(
         (e) =>
           e.start > eventEndMin &&
@@ -362,8 +446,8 @@ function calculateBreakdownTime(
  */
 export function generateNotes(
   eventGroups: EventGroup[],
-  allRows: CsvEventRow[],
-  coursedogEvents: Map<string, CoursedogEvent>
+  coursedogEvents: Map<string, CoursedogEvent>,
+  venueTimelines: VenueTimelines
 ): GeneratedNote[] {
   const notes: GeneratedNote[] = [];
 
@@ -377,17 +461,22 @@ export function generateNotes(
       }
     }
 
-    // Determine setup instructions from CSV internalNotes column.
-    // Use the raw value directly — the column already contains furniture/setup details.
-    // Fall back to extracting from a previously-formatted note if the raw value looks
-    // like a full note (contains "Please set up").
+    // Determine setup instructions and additional notes from CSV internalNotes column.
+    // Content inside {braces} → setup instructions (placed after setup time line).
+    // Content outside braces → additional notes (placed after breakdown with two blank lines).
+    // If no braces, fall back to legacy behavior (entire string = setup instructions).
     let setupInstructions = group.setupInstructions;
+    let additionalNotes = "";
     if (!setupInstructions) {
       const csvNotes = group.rows.find((r) => r.internalNotes)?.internalNotes ?? "";
       if (csvNotes) {
-        setupInstructions = csvNotes.toLowerCase().includes("please set up")
-          ? extractSetupInstructions(csvNotes)
-          : csvNotes.trim();
+        if (csvNotes.toLowerCase().includes("please set up")) {
+          setupInstructions = extractSetupInstructions(csvNotes);
+        } else {
+          const parsed = parseInternalNotes(csvNotes);
+          setupInstructions = parsed.setupInstructions;
+          additionalNotes = parsed.additionalNotes;
+        }
       }
     }
 
@@ -402,8 +491,8 @@ export function generateNotes(
     const venueLabel = getVenueLabel(group.locations);
 
     // Calculate setup and breakdown times
-    const { setupTime, warnings } = calculateSetupTime(group, allRows);
-    const breakdownTime = calculateBreakdownTime(group, allRows);
+    const { setupTime, warnings } = calculateSetupTime(group, venueTimelines);
+    const breakdownTime = calculateBreakdownTime(group, venueTimelines);
 
     // Build the full note
     const fullNote = buildNoteText({
@@ -413,6 +502,7 @@ export function generateNotes(
       setupTime,
       setupInstructions,
       breakdownTime,
+      additionalNotes,
     });
 
     notes.push({
@@ -423,6 +513,7 @@ export function generateNotes(
       setupTimeLine: setupTime,
       setupInstructions,
       breakdownTimeLine: breakdownTime,
+      additionalNotes,
       fullNote,
       warnings,
     });
@@ -471,6 +562,7 @@ function buildNoteText(parts: {
   setupTime: string;
   setupInstructions: string;
   breakdownTime: string;
+  additionalNotes: string;
 }): string {
   const lines: string[] = [];
 
@@ -486,6 +578,12 @@ function buildNoteText(parts: {
   lines.push("");
   lines.push(parts.breakdownTime);
 
+  if (parts.additionalNotes) {
+    lines.push("");
+    lines.push("");
+    lines.push(parts.additionalNotes);
+  }
+
   return lines.join("\n");
 }
 
@@ -499,7 +597,8 @@ export function rebuildNoteText(
   venueLabel: string,
   setupTime: string,
   setupInstructions: string,
-  breakdownTime: string
+  breakdownTime: string,
+  additionalNotes: string
 ): string {
   return buildNoteText({
     accountNumber,
@@ -508,5 +607,6 @@ export function rebuildNoteText(
     setupTime,
     setupInstructions,
     breakdownTime,
+    additionalNotes,
   });
 }

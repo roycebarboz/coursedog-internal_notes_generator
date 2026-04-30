@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { updateEventNotes } from "@/lib/coursedog";
 
 interface NoteSubmission {
@@ -9,12 +7,6 @@ interface NoteSubmission {
 }
 
 export async function POST(request: Request) {
-  // Auth check
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const body = await request.json();
     const { notes } = body as { notes: NoteSubmission[] };

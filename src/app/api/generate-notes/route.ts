@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { parseCsvRows, groupEvents } from "@/lib/csv-parser";
-import { generateNotes } from "@/lib/note-generator";
-import { fetchEvents } from "@/lib/coursedog";
+import { generateNotes, buildVenueTimelines } from "@/lib/note-generator";
+import { fetchEvents, fetchMeetings } from "@/lib/coursedog";
 
 export async function POST(request: Request) {
-  // Auth check
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const body = await request.json();
     const { csvData } = body as { csvData: Record<string, string>[] };
@@ -37,8 +29,20 @@ export async function POST(request: Request) {
     const allEventIds = groups.flatMap((g) => g.eventIds);
     const coursedogEvents = await fetchEvents(allEventIds);
 
-    // 4. Generate notes
-    const notes = generateNotes(groups, rows, coursedogEvents);
+    // 4. Determine date range and fetch all room meetings from Coursedog
+    //    Include ±1 day buffer for prior-day setup and next-day breakdown checks
+    const sortedDates = groups.map((g) => g.date).sort();
+    const firstDate = new Date(sortedDates[0]);
+    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    firstDate.setDate(firstDate.getDate() - 1);
+    lastDate.setDate(lastDate.getDate() + 1);
+    const toISO = (d: Date) => d.toISOString().slice(0, 10);
+
+    const rawMeetings = await fetchMeetings(toISO(firstDate), toISO(lastDate));
+    const venueTimelines = buildVenueTimelines(rawMeetings);
+
+    // 5. Generate notes
+    const notes = generateNotes(groups, coursedogEvents, venueTimelines);
 
     return NextResponse.json({
       notes: notes.map((n) => ({

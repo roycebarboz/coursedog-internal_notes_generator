@@ -80,6 +80,33 @@ export async function fetchEvents(eventIds: string[]): Promise<Map<string, Cours
   return map;
 }
 
+/**
+ * Fetch all meetings in a date range from the Coursedog meetings API.
+ * Returns an object keyed by meeting ID. Each meeting includes roomId,
+ * start/end times, eventId, eventData, isSetup, isTeardown, etc.
+ */
+export async function fetchMeetings(
+  startDate: string,
+  endDate: string
+): Promise<Record<string, Record<string, unknown>>> {
+  const token = await getToken();
+  const schoolId = getSchoolId();
+  const url = `${BASE_URL}/em/${schoolId}/meetings?startDate=${startDate}&endDate=${endDate}`;
+
+  const resp = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch meetings (${resp.status})`);
+  }
+
+  return resp.json();
+}
+
 /** Update the internal events notes on a Coursedog event. */
 export async function updateEventNotes(eventId: string, notes: string): Promise<void> {
   const token = await getToken();
