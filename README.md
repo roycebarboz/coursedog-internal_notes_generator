@@ -1,6 +1,6 @@
 # Coursedog Internal Notes Generator
 
-A Next.js app that automates writing internal event notes for the facilities team — replacing a tedious manual process with a one-click workflow.
+A Next.js app that automates writing internal event notes for the University Events team — replacing a tedious manual process with a one-click workflow.
 
 ---
 
